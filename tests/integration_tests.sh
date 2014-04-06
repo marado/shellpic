@@ -11,12 +11,12 @@ compare_output() {
     command=$1
     expected_output=$2
     tmpfile=workdir/tmp/$(basename $expected_output)
+    
+    TESTS=$((TESTS+1))
 
     /bin/echo -n "Comparing \"$command\" with $expected_output ... "
-    $command > $tmpfile
+    $command > $tmpfile    
     if diff $tmpfile $expected_output > /dev/null; 
-
-    TESTS=$((TESTS+1))
     then
         echo "OK!"
         TESTS_OK=$((TESTS_OK+1))
@@ -41,7 +41,7 @@ then
     true
 else
     echo
-    echo $((TEST-TESTS_OK))/$TESTS tests failed!
+    echo $((TESTS-TESTS_OK))/$TESTS tests failed!
     echo
     false
 fi
