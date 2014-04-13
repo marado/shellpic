@@ -36,10 +36,9 @@ class Shell(shellpic.Formatter):
     """
     def __init__(self):
         super(Shell, self).__init__()
-        self._prev_frame = None
 
     @staticmethod
-    def dimentions():
+    def dimensions():
         """
         Return the number of columns and rows in the current terminal.
         """
@@ -128,38 +127,8 @@ class Shell(shellpic.Formatter):
         """
         self._origin = self.probe_cursor_pos()
 
-    def need_repaint(self, pixels, x, y):
-        """
-        Return True if the pixels at (x, y) or (x, y + 1) needs to be
-        redrawn.
-        """
-        if pixels[x][y] != self._prev_frame[x][y]:
-            return True
-        elif pixels[x][y + 1] != self._prev_frame[x][y + 1]:
-            return True
-        else:
-            return False
 
-    def color(self, pixels, dispose, x, y):
-        """
-        Return the color at (x, y) taking into account previous frames
-        and dispose.
-        """
-        rgba = pixels[x][y]
-        if rgba[3] == 0:
-            if dispose:
-                rgba = dispose[x][y]
-            elif self._prev_frame:
-                rgba = self._prev_frame[x][y]
-            else:
-                rgba = (0, 0, 0, 255)
-        self._prev_frame[x][y] = rgba
-        return rgba
-
-    def format(self, image, dispose=None):
-        assert image.mode == 'RGBA'
-        if dispose:
-            assert dispose.mode == 'RGBA'
+    def format(self, image):
 
         file_str = StringIO.StringIO()
 
@@ -168,7 +137,7 @@ class Shell(shellpic.Formatter):
         # we must add a row for images with a odd numbered height
         padded_height = height if height % 2 == 0 else height + 1
 
-        if not self._prev_frame:
+        if not self._origin:
             # create some empty space to draw on
             file_str.write('\n' * (padded_height / 2))
 
@@ -177,16 +146,14 @@ class Shell(shellpic.Formatter):
             # from files
             if os.isatty(sys.stdin.fileno()) and os.isatty(sys.stdout.fileno()):
                 x, y = self.probe_cursor_pos()
-                term_width, term_height = self.dimentions()
+                term_width, term_height = self.dimensions()
                 if y + (padded_height / 2) > term_height:
                     adjust = (y + (padded_height / 2)) - term_height
                     self._origin = x, y - adjust
                 else:
                     self._origin = x, y
-
-            # assume a black background
-            self._prev_frame = [[[0, 0, 0, 255] for y in range(padded_height)] for x in range(width)]
-
+            else:
+                self._origin = 0, 0
 
 
         # put the pixels in a two-dimentional array
@@ -195,28 +162,13 @@ class Shell(shellpic.Formatter):
             for x in range(width):
                 pixels.append([0, 0, 0, 255])
 
-
-        # put the dispose in a two-dimentional array
-        if dispose:
-            try:
-                dispose_pixels = shellpic.pixels(dispose)
-            except AttributeError:
-                # i suppose things like are bound to happen when i depend on a undocumented property...
-                dispose_pixels = [[[0, 0, 0, 255] for y in range(height)] for x in range(width)]
-
-            if padded_height != height:
-                for x in range(width):
-                    dispose_pixels.append([0, 0, 0, 255])
-        else:
-            dispose_pixels = None
-
         # draw the image
         for y in range(0, height - 1, 2):
             for x in range(0, width):
-                if self.need_repaint(pixels, x, y):
-                    file_str.write(self.move_cursor(x, y / 2))
-                    file_str.write(self.colorcode(self.color(pixels, dispose_pixels, x, y),
-                                                  self.color(pixels, dispose_pixels, x, y + 1)))
+                #if pixels[x][y][3] > 0 or pixels[x][y + 1][3] > 0:
+                file_str.write(self.move_cursor(x, y / 2))
+                file_str.write(self.colorcode(pixels[x][y], pixels[x][y + 1]))
+
         file_str.write(self.move_cursor(width, padded_height / 2))
         file_str.write(chr(27) + u"[0m")
         return file_str.getvalue()
